@@ -1,4 +1,4 @@
-Skills used: aggregate funciotns, window functions, views, inner, left and right joins, CASE. 
+Skills used: aggregate functions, window functions, views, inner, left and right joins, CASE. 
 
 CREATE TABLE agency(
 agency_id BIGINT,
@@ -329,7 +329,7 @@ JOIN agency
 ON agency.agency_id = arfmscore20**_**.agency_id
 
 
--- finally comparing the rating for each year in more steps to not crush the computer 
+-- finally comparing the rating for each year (in multiple steps to not crush the computer) 
 
 
 CREATE VIEW final2016_18 AS
