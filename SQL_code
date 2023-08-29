@@ -1,3 +1,5 @@
+Skills used: aggregate funciotns, window functions, views, inner, left and right joins, CASE. 
+
 CREATE TABLE agency(
 agency_id BIGINT,
 platform_id BIGINT,
