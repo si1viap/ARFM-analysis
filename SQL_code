@@ -1,0 +1,404 @@
+CREATE TABLE agency(
+agency_id BIGINT,
+platform_id BIGINT,
+name VARCHAR(1000),
+street VARCHAR(255),
+state_id VARCHAR(10),
+city_id VARCHAR(10),
+postal_code VARCHAR(10),
+sdi VARCHAR(255),
+email VARCHAR(255),
+certified_email VARCHAR(255),
+v VARCHAR(255),
+i VARCHAR(255),
+b VARCHAR(255),
+bc VARCHAR(255),
+m VARCHAR(255),
+r VARCHAR(255),
+s VARCHAR(255),
+c VARCHAR(255),
+cp VARCHAR(255),
+p VARCHAR(255),
+rp VARCHAR(255),
+cc VARCHAR(255),
+cs VARCHAR(255),
+cb VARCHAR(255),
+nl VARCHAR(255),
+lb VARCHAR(255),
+lp VARCHAR(255),
+ia VARCHAR(255),
+da VARCHAR(255),
+created_at TIMESTAMP,
+updated_at TIMESTAMP
+);
+
+-- import csv of all the agencies (=customers)
+
+-- create a column for each year to calculate the age of the relationship with the agency
+
+ALTER TABLE agency 
+ADD lenght2016_17 INT;
+-----------------------------------------------------
+UPDATE agency 
+SET lenght2016_17 = TIMESTAMPDIFF(MONTH,created_at, '2017-08-01');
+-----------------------------------------------------
+ALTER TABLE agency 
+ADD lenght2017_18 INT;
+-----------------------------------------------------
+UPDATE agency 
+SET lenght2017_18 = TIMESTAMPDIFF(MONTH,created_at, '2018-08-01');
+-----------------------------------------------------
+ALTER TABLE agency 
+ADD lenght2018_19 INT;
+-----------------------------------------------------
+UPDATE agency 
+SET lenght2018_19 = TIMESTAMPDIFF(MONTH,created_at, '2019-08-01');
+-----------------------------------------------------
+ALTER TABLE agency 
+ADD lenght2019_20 INT;
+-----------------------------------------------------
+UPDATE agency 
+SET lenght2019_20 = TIMESTAMPDIFF(MONTH,created_at, '2020-08-01');
+-----------------------------------------------------
+ALTER TABLE agency 
+ADD lenght2020_21 INT;
+-----------------------------------------------------
+UPDATE agency 
+SET lenght2020_21 = TIMESTAMPDIFF(MONTH,created_at, '2021-08-01');
+-----------------------------------------------------
+ALTER TABLE agency 
+ADD lenght2021_22 INT;
+-----------------------------------------------------
+UPDATE agency 
+SET lenght2021_22 = TIMESTAMPDIFF(MONTH,created_at, '2022-08-01');
+-----------------------------------------------------
+ALTER TABLE agency 
+ADD lenght2022_23 INT;
+-----------------------------------------------------
+UPDATE agency 
+SET lenght2022_23 = TIMESTAMPDIFF(MONTH,created_at, '2023-08-01');
+
+-- PERFORM THE CLASSIC RFM WITH SOME UPGRADES
+
+CREATE TABLE rfm20**_**(
+  id BIGINT,
+	movement_type_id INT,
+	parent_movement_id VARCHAR(2),
+	agency_id BIGINT,
+ 	made_by_user_id BIGINT,
+	subscription_id INT,
+	course_activation_code_id INT,
+	electronic_payment_id INT,
+	agency_plan_log_id INT,
+	live_course_event_session_id INT,
+	two_factor_auth_log_id INT,
+	value BIGINT,
+	note VARCHAR(5000),
+	ignore_for_balance_analysis VARCHAR(9),
+	created_at TIMESTAMP,
+	updated_at TIMESTAMP
+);
+
+-- import csv
+
+-- rfm for every year (from august to august)
+CREATE VIEW rfm_calc20**_** AS
+SELECT agency_id, DATEDIFF('20**-08-01',MAX(created_at)) AS Recency,
+       COUNT(id) AS Frequency,
+       SUM(value) AS Monetary_Value
+FROM rfm20**_**
+GROUP BY agency_id;
+
+-- calculate the monetary value in dependence of the lenght of the relationship with the agency (=customer) for every year
+CREATE VIEW monetary_value20**_** AS
+SELECT t1.agency_id, Monetary_Value/t2.lenght20**_* AS Monetary_Value
+FROM rfm_calc20**_** AS t1
+JOIN agency AS t2
+ON t1.agency_id = t2.agency_id;
+
+-- minmax view for every year
+
+CREATE VIEW MinMax20**_** AS
+SELECT 
+		MIN(t1.Recency) AS Rmin,
+		MAX(t1.Recency) AS Rmax,
+		MIN(t1.Frequency) AS Fmin,
+		MAX(t1.Frequency) AS Fmax,
+		MIN(t2.Monetary_Value) AS Mmin,
+		MAX(t2.Monetary_Value) AS Mmax
+FROM rfm_calc20**_** AS t1
+JOIN monetary_value20**_** AS t2
+ON t1.agency_id = t2.agency_id;
+
+-- create legend per year
+
+CREATE VIEW legend20**_** AS
+SELECT DISTINCT 
+ 		'Monetary_Value' AS ARFM,
+ 		  M.Mmin AS Min,
+		  FIRST_VALUE(Monetary_Value) OVER(ORDER BY CASE WHEN p <=0.2 THEN p END DESC) p2, 
+		  FIRST_VALUE(Monetary_Value) OVER(ORDER BY CASE WHEN p <=0.4 THEN p END DESC) p4,       		  
+		  FIRST_VALUE(Monetary_Value) OVER(ORDER BY CASE WHEN p <=0.6 THEN p END DESC) p6, 	    
+                  FIRST_VALUE(Monetary_Value) OVER(ORDER BY CASE WHEN p <=0.8 THEN p END DESC) p8,
+		  M.Mmax AS Max
+
+FROM MinMax20**_** As M JOIN (SELECT Monetary_Value, PERCENT_RANK() OVER 
+(PARTITION BY Monetary_Value IS NOT NULL ORDER BY Monetary_Value) p
+FROM monetary_value20**_**) AS t ON 1=1
+
+-- Percentiles F
+
+UNION SELECT DISTINCT 
+ 		'Frequency' AS ARFM,
+ 		  F.Fmin AS Min,
+		  FIRST_VALUE(Frequency) OVER(ORDER BY CASE WHEN p <=0.2 THEN p END DESC) p2, 
+		  FIRST_VALUE(Frequency) OVER(ORDER BY CASE WHEN p <=0.4 THEN p END DESC) p4,       		  
+      FIRST_VALUE(Frequency) OVER(ORDER BY CASE WHEN p <=0.6 THEN p END DESC) p6, 	     		  
+      FIRST_VALUE(Frequency) OVER(ORDER BY CASE WHEN p <=0.8 THEN p END DESC) p8,
+		  F.Fmax AS Max
+
+FROM MinMax20**_** As F JOIN (SELECT Frequency, PERCENT_RANK() OVER (ORDER BY Frequency) p
+FROM rfm_calc20**_**) AS t ON 1=1
+
+-- Percentiles R
+
+UNION SELECT DISTINCT 
+ 		'Recency' AS ARFM,
+ 		  R.Rmin AS Min,
+		  FIRST_VALUE(Recency) OVER(ORDER BY CASE WHEN p <=0.2 THEN p END DESC) p2, 
+		  FIRST_VALUE(Recency) OVER(ORDER BY CASE WHEN p <=0.4 THEN p END DESC) p4,       		  
+      FIRST_VALUE(Recency) OVER(ORDER BY CASE WHEN p <=0.6 THEN p END DESC) p6, 	     		  
+      FIRST_VALUE(Recency) OVER(ORDER BY CASE WHEN p <=0.8 THEN p END DESC) p8,
+		  R.Rmax AS Max
+
+FROM MinMax20**_** As R JOIN (SELECT Recency, PERCENT_RANK() OVER (ORDER BY Recency) p
+FROM rfm_calc20**_**) AS t ON 1=1;
+
+-- calculate the Activity
+
+CREATE TABLE neg20**_**(
+  id BIGINT,
+	movement_type_id INT,
+	parent_movement_id VARCHAR(2),
+	agency_id BIGINT,
+ 	made_by_user_id BIGINT,
+	subscription_id INT,
+	course_activation_code_id INT,
+	electronic_payment_id INT,
+	agency_plan_log_id INT,
+	live_course_event_session_id INT,
+	two_factor_auth_log_id INT,
+	value BIGINT,
+	note VARCHAR(5000),
+	ignore_for_balance_analysis VARCHAR(9),
+	created_at TIMESTAMP,
+	updated_at TIMESTAMP
+);
+
+-- import csv
+
+-- extract the row number of activities for each year
+
+CREATE VIEW n_movements20**_** AS
+SELECT agency_id, COUNT(*) AS n_movements
+FROM neg20**_**
+GROUP BY agency_id;
+
+CREATE VIEW Activities20**_** AS
+SELECT t2.agency_id, n_movements
+FROM n_movements20**_** as t1
+JOIN rfm20**_** as t2
+ON t1.agency_id = t2.agency_id
+GROUP BY agency_id;
+
+-- highlight the relation with the lenght for each year
+
+CREATE VIEW results20**_** As
+SELECT t1.agency_id, n_movements/t2.lenght20**_** AS Activity
+FROM activities20**_** AS t1
+JOIN agency AS t2
+ON t1.agency_id = t2.agency_id;
+
+-- create legend per year
+CREATE VIEW nMinMax20**_** AS
+SELECT 
+		MIN(Activity) AS nmin,
+		MAX(Activity) AS nmax
+FROM results20**_**;
+
+CREATE VIEW nlegend20**_** AS
+SELECT DISTINCT 
+ 		'Activity' AS ARFM,
+ 		  M.nmin AS Min,
+		  FIRST_VALUE(Activity) OVER(ORDER BY CASE WHEN p <=0.2 THEN p END DESC) p2, 
+		  FIRST_VALUE(Activity) OVER(ORDER BY CASE WHEN p <=0.4 THEN p END DESC) p4,       		  
+		  FIRST_VALUE(Activity) OVER(ORDER BY CASE WHEN p <=0.6 THEN p END DESC) p6, 	    
+                  FIRST_VALUE(Activity) OVER(ORDER BY CASE WHEN p <=0.8 THEN p END DESC) p8,
+		  M.nmax AS Max
+
+FROM nMinMax20**_** As M JOIN (SELECT Activity, PERCENT_RANK() 
+OVER (PARTITION BY Activity IS NOT NULL ORDER BY Activity) p
+FROM results20**_**) AS t ON 1=1;
+
+-- Beginning of the real ARFM
+
+CREATE VIEW arfm20**_** AS
+SELECT t1.agency_id AS agency_id,IFNULL(Activity,0) AS Activity,
+Recency,Frequency,t1.Monetary_Value AS Monetary_Value
+FROM monetary_value20**_**  AS t1
+LEFT JOIN rfm_calc20**_**  AS t2
+ON t1.agency_id = t2.agency_id
+LEFT JOIN results20**_**  AS t3
+ON t2.agency_id = t3.agency_id
+
+-- assigning scores based on a legend decided with the marketing team
+
+
+CREATE VIEW arfmscore20**_** AS
+SELECT agency_id,
+CASE WHEN Activity BETWEEN 0.00 AND 4.99 THEN 1
+	 WHEN Activity BETWEEN 5.00 AND 19.99 THEN 2
+	 WHEN Activity BETWEEN 20.00 AND 39.99 THEN 3
+	 WHEN Activity BETWEEN 40.00 AND 119.99 THEN 4
+	 WHEN Activity >= 120 THEN 5
+ELSE 'other'
+END AS Activity_score,
+CASE WHEN Recency BETWEEN 1 AND 25 THEN 5
+	 WHEN Recency BETWEEN 26 AND 53 THEN 4
+	 WHEN Recency BETWEEN 54 AND 90 THEN 3
+	 WHEN Recency BETWEEN 91 AND 150 THEN 2
+	 WHEN Recency >= 151 THEN 1
+ELSE 'other'
+END AS Recency_score,
+CASE WHEN Frequency = 1 THEN 1
+	 WHEN Frequency BETWEEN 2 AND 3 THEN 2
+	 WHEN Frequency BETWEEN 4 AND 6 THEN 3
+	 WHEN Frequency BETWEEN 7 AND 12 THEN 4
+	 WHEN Frequency >= 13 THEN 5
+ELSE 'other'
+END AS Frequency_score,
+CASE WHEN Monetary_Value BETWEEN 0 AND 24.99 THEN 1
+	 WHEN Monetary_Value BETWEEN 25 AND 99.99 THEN 2
+	 WHEN Monetary_Value BETWEEN 100 AND 249.99 THEN 3
+	 WHEN Monetary_Value BETWEEN 250 AND 499.99 THEN 4
+   WHEN Monetary_Value >= 500 THEN 5
+ELSE 'new'
+END AS Monetary_score
+FROM arfm20**_**
+
+-- insert every agency in a category
+
+CREATE VIEW arfmcategory20**_** AS
+SELECT agency.agency_id,
+CASE WHEN TIMESTAMPDIFF(day, agency.created_at,'20**-08-01') < 365 THEN 'NEW'
+	 WHEN (Monetary_score = 5) AND (Frequency_score BETWEEN 3 AND 5) AND (Recency_score BETWEEN 3 AND 5) AND (Activity_score BETWEEN 4 AND 5) THEN 5
+	 WHEN (Monetary_score = 5) AND (Frequency_score BETWEEN 2 AND 3) AND (Recency_score BETWEEN 2 AND 3) AND (Activity_score BETWEEN 4 AND 5) THEN 5
+	 WHEN (Monetary_score = 5) AND (Frequency_score BETWEEN 3 AND 5) AND (Recency_score BETWEEN 3 AND 5) AND (Activity_score =3) THEN 4
+	  WHEN (Monetary_score = 4) AND (Frequency_score BETWEEN 3 AND 5) AND (Recency_score BETWEEN 3 AND 5) AND (Activity_score BETWEEN 3 AND 5) THEN 4
+	  WHEN (Monetary_score = 4) AND (Frequency_score BETWEEN 3 AND 5) AND (Recency_score BETWEEN 3 AND 5) AND (Activity_score BETWEEN 1 AND 2) THEN 4
+	  WHEN (Monetary_score = 4) AND (Frequency_score BETWEEN 3 AND 5) AND (Recency_score BETWEEN 1 AND 2) AND (Activity_score BETWEEN 3 AND 5) THEN 4
+	  WHEN (Monetary_score = 4) AND (Frequency_score BETWEEN 1 AND 2) AND (Recency_score BETWEEN 3 AND 5) AND (Activity_score BETWEEN 3 AND 5) THEN 4
+	  WHEN (Monetary_score = 4) AND (Frequency_score BETWEEN 3 AND 5) AND (Recency_score BETWEEN 1 AND 2) AND (Activity_score BETWEEN 1 AND 2) THEN 4
+	  WHEN (Monetary_score = 4) AND (Frequency_score BETWEEN 1 AND 2) AND (Recency_score BETWEEN 1 AND 2) AND (Activity_score BETWEEN 3 AND 5) THEN 4
+	  WHEN (Monetary_score = 4) AND (Frequency_score BETWEEN 1 AND 2) AND (Recency_score BETWEEN 3 AND 5) AND (Activity_score BETWEEN 1 AND 2) THEN 4
+	  WHEN (Monetary_score = 3) AND (Frequency_score BETWEEN 3 AND 5) AND (Recency_score BETWEEN 3 AND 5) AND (Activity_score BETWEEN 3 AND 5) THEN 3
+	  WHEN (Monetary_score = 2) AND (Frequency_score BETWEEN 3 AND 5) AND (Recency_score BETWEEN 3 AND 5) AND (Activity_score BETWEEN 3 AND 5) THEN 3
+	  WHEN (Monetary_score = 3) AND (Frequency_score BETWEEN 3 AND 5) AND (Recency_score BETWEEN 3 AND 5) AND (Activity_score BETWEEN 1 AND 2) THEN 3
+	  WHEN (Monetary_score = 3) AND (Frequency_score BETWEEN 3 AND 5) AND (Recency_score BETWEEN 1 AND 2) AND (Activity_score BETWEEN 3 AND 5) THEN 3
+	  WHEN (Monetary_score = 3) AND (Frequency_score BETWEEN 1 AND 2) AND (Recency_score BETWEEN 3 AND 5) AND (Activity_score BETWEEN 3 AND 5) THEN 3
+	  WHEN (Monetary_score = 3) AND (Frequency_score BETWEEN 1 AND 2) AND (Recency_score BETWEEN 3 AND 5) AND (Activity_score BETWEEN 1 AND 2) THEN 3
+	  WHEN (Monetary_score = 3) AND (Frequency_score BETWEEN 1 AND 2) AND (Recency_score BETWEEN 1 AND 2) AND (Activity_score BETWEEN 3 AND 5) THEN 3
+	  WHEN (Monetary_score = 3) AND (Frequency_score BETWEEN 3 AND 5) AND (Recency_score BETWEEN 1 AND 2) AND (Activity_score BETWEEN 1 AND 2) THEN 3
+	  WHEN (Monetary_score BETWEEN 3 AND 5) AND (Frequency_score BETWEEN 1 AND 2) AND (Recency_score BETWEEN 1 AND 2) AND (Activity_score BETWEEN 1 AND 2) THEN 2
+	  WHEN (Monetary_score = 2) AND (Frequency_score BETWEEN 2 AND 3) AND (Recency_score BETWEEN 2 AND 3) AND (Activity_score BETWEEN 2 AND 3) THEN 2
+	  WHEN (Monetary_score = 2) AND (Frequency_score BETWEEN 3 AND 5) AND (Recency_score BETWEEN 1 AND 2) AND (Activity_score BETWEEN 3 AND 5) THEN 2
+	  WHEN (Monetary_score = 2) AND (Frequency_score BETWEEN 3 AND 5) AND (Recency_score BETWEEN 3 AND 5) AND (Activity_score BETWEEN 1 AND 2) THEN 2
+	  WHEN (Monetary_score = 2) AND (Frequency_score BETWEEN 1 AND 2) AND (Recency_score BETWEEN 3 AND 5) AND (Activity_score BETWEEN 3 AND 5) THEN 2
+	  WHEN (Monetary_score = 2) AND (Frequency_score BETWEEN 3 AND 5) AND (Recency_score BETWEEN 1 AND 2) AND (Activity_score BETWEEN 1 AND 2) THEN 2
+	  WHEN (Monetary_score = 2) AND (Frequency_score BETWEEN 1 AND 2) AND (Recency_score BETWEEN 3 AND 5) AND (Activity_score BETWEEN 1 AND 2) THEN 2
+	  WHEN (Monetary_score = 2) AND (Frequency_score BETWEEN 1 AND 2) AND (Recency_score BETWEEN 1 AND 2) AND (Activity_score BETWEEN 3 AND 5) THEN 2
+	  WHEN (Monetary_score = 2) AND (Frequency_score =2) AND (Recency_score =2) AND (Activity_score =2) THEN 2
+	  WHEN (Monetary_score = 2) AND (Frequency_score BETWEEN 1 AND 2) AND (Recency_score BETWEEN 1 AND 2) AND (Activity_score BETWEEN 1 AND 2) THEN 1
+	  WHEN Monetary_score = 1 THEN 1
+ELSE 'error'
+END AS Category
+FROM arfmscore20**_**
+JOIN agency 
+ON agency.agency_id = arfmscore20**_**.agency_id
+
+
+-- finally comparing the rating for each year in more steps to not crush the computer 
+
+
+CREATE VIEW final2016_18 AS
+SELECT t1.agency_id, t1.category AS 2016_17,t2.category AS 2017_18
+FROM arfmcategory2016_17 AS t1
+LEFT JOIN arfmcategory2017_18 as t2
+ON t1.agency_id=t2.agency_id
+UNION  ALL
+SELECT t2.agency_id, t1.category AS 2016_17,t2.category AS 2017_18
+FROM arfmcategory2016_17 AS t1
+RIGHT JOIN arfmcategory2017_18 as t2
+ON t1.agency_id=t2.agency_id
+WHERE t1.agency_id IS NULL;
+
+CREATE VIEW final2016_19 AS
+SELECT t1.agency_id, 2016_17,2017_18, t2.category AS 2018_19
+FROM final2016_18 AS t1
+LEFT JOIN arfmcategory2018_19 as t2
+ON t1.agency_id=t2.agency_id
+UNION  ALL
+SELECT t2.agency_id, 2016_17,2017_18, t2.category AS 2018_19
+FROM final2016_18 AS t1
+RIGHT JOIN arfmcategory2018_19 as t2
+ON t1.agency_id=t2.agency_id
+WHERE t1.agency_id IS NULL;
+
+CREATE VIEW final2016_20 AS
+SELECT t1.agency_id, 2016_17,2017_18,2018_19, t2.category AS 2019_20
+FROM final2016_19 AS t1
+LEFT JOIN arfmcategory2019_20 as t2
+ON t1.agency_id=t2.agency_id
+UNION  ALL
+SELECT t2.agency_id, 2016_17,2017_18,2018_19, t2.category AS 2019_20
+FROM final2016_19 AS t1
+RIGHT JOIN arfmcategory2019_20 as t2
+ON t1.agency_id=t2.agency_id
+WHERE t1.agency_id IS NULL;
+
+CREATE VIEW final2016_21 AS
+SELECT t1.agency_id, 2016_17,2017_18,2018_19,2019_20,t2.category AS 2020_21
+FROM final2016_20 AS t1
+LEFT JOIN arfmcategory2020_21 as t2
+ON t1.agency_id=t2.agency_id
+UNION  ALL
+SELECT t2.agency_id, 2016_17,2017_18,2018_19,2019_20,t2.category AS 2020_21
+FROM final2016_20 AS t1
+RIGHT JOIN arfmcategory2020_21 as t2
+ON t1.agency_id=t2.agency_id
+WHERE t1.agency_id IS NULL;
+
+CREATE VIEW final2016_22 AS
+SELECT t1.agency_id, 2016_17,2017_18,2018_19,2019_20,2020_21,t2.category AS 2021_22
+FROM final2016_21 AS t1
+LEFT JOIN arfmcategory2021_22 as t2
+ON t1.agency_id=t2.agency_id
+UNION  ALL
+SELECT t2.agency_id, 2016_17,2017_18,2018_19,2019_20,2020_21,t2.category AS 2021_22
+FROM final2016_21 AS t1
+RIGHT JOIN arfmcategory2021_22 as t2
+ON t1.agency_id=t2.agency_id
+WHERE t1.agency_id IS NULL;
+
+CREATE VIEW final2016_23 AS
+SELECT t1.agency_id, 2016_17,2017_18,2018_19,2019_20,2020_21,2021_22,t2.category AS 2022_23
+FROM final2016_22 AS t1
+LEFT JOIN arfmcategory2022_23 as t2
+ON t1.agency_id=t2.agency_id
+UNION  ALL
+SELECT t2.agency_id, 2016_17,2017_18,2018_19,2019_20,2020_21,2021_22,t2.category AS 2022_23
+FROM final2016_22 AS t1
+RIGHT JOIN arfmcategory2022_23 as t2
+ON t1.agency_id=t2.agency_id
+WHERE t1.agency_id IS NULL
+
